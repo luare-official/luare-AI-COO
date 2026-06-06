@@ -5,6 +5,7 @@ import { AppItem, ItemType, ProjectSummary } from '@/types/task';
 import { v4 as uuidv4 } from 'uuid';
 import * as storage from '@/utils/storageManager';
 import type { RestoreInfo, DataCounts } from '@/utils/storageManager';
+import * as gdrive from '@/utils/googleDriveSync';
 
 interface ItemContextType {
   items: AppItem[];
@@ -23,6 +24,13 @@ interface ItemContextType {
   restoreInfo: RestoreInfo | null;
   acceptRestore: () => void;
   dismissRestore: () => void;
+  // Phase 4: Google Drive Sync
+  gdriveLinked: boolean;
+  isSyncing: boolean;
+  lastSyncTime: number | null;
+  syncError: string | null;
+  syncWithDrive: () => Promise<'synced_to_cloud' | 'loaded_from_cloud' | 'already_up_to_date' | void>;
+  disconnectDrive: () => void;
 }
 
 const ItemContext = createContext<ItemContextType | undefined>(undefined);
@@ -196,13 +204,91 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     setRestoreInfo(null);
   }, []);
 
+  // Phase 4: Google Drive Sync
+  const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+  const [gdriveLinked, setGdriveLinked] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Initialize GIS on mount
+  useEffect(() => {
+    if (GOOGLE_CLIENT_ID) {
+      gdrive.initGoogleDriveSync(GOOGLE_CLIENT_ID)
+        .then(() => {
+          setGdriveLinked(gdrive.isGdriveLinked());
+          const lastSync = localStorage.getItem('gdrive_last_sync_time');
+          if (lastSync) {
+            setLastSyncTime(parseInt(lastSync, 10));
+          }
+        })
+        .catch((err) => {
+          console.error('[googleDriveSync] Initialization failed:', err);
+        });
+    }
+  }, [GOOGLE_CLIENT_ID]);
+
+  // Sync function
+  const syncWithDrive = useCallback(async () => {
+    if (!GOOGLE_CLIENT_ID) {
+      const errMessage = 'Google Client ID が設定されていません。.env.local を確認してください。';
+      setSyncError(errMessage);
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncError(null);
+
+    try {
+      const loaded = storage.load();
+      const localData = loaded || {
+        schemaVersion: 2,
+        savedAt: 0,
+        items: [],
+        projectSummaries: [],
+      };
+
+      const result = await gdrive.syncWithGoogleDrive(localData);
+
+      if (result.action === 'loaded_from_cloud' && result.cloudData) {
+        setItems(result.cloudData.items || []);
+        setProjectSummaries(result.cloudData.projectSummaries || []);
+        storage.save(result.cloudData.items || [], result.cloudData.projectSummaries || []);
+      }
+
+      setGdriveLinked(true);
+      const now = Date.now();
+      setLastSyncTime(now);
+      localStorage.setItem('gdrive_last_sync_time', String(now));
+
+      setIsSyncing(false);
+      return result.action;
+    } catch (err: any) {
+      console.error('[googleDriveSync] Sync failed:', err);
+      setSyncError(err.message || '同期中にエラーが発生しました。');
+      setIsSyncing(false);
+      throw err;
+    }
+  }, [items, projectSummaries, GOOGLE_CLIENT_ID]);
+
+  // Disconnect function
+  const disconnectDrive = useCallback(() => {
+    gdrive.disconnectGoogleDrive();
+    setGdriveLinked(false);
+    setLastSyncTime(null);
+    setSyncError(null);
+    localStorage.removeItem('gdrive_last_sync_time');
+  }, []);
+
   return (
     <ItemContext.Provider value={{ 
       items, projectSummaries, 
       addItem, updateItem, deleteItem, updateItems, 
       updateProjectSummaries, updateProjectSummary, clearAll,
       exportData, importData, getDataCounts: getDataCountsFn,
-      restoreInfo, acceptRestore, dismissRestore
+      restoreInfo, acceptRestore, dismissRestore,
+      gdriveLinked, isSyncing, lastSyncTime, syncError,
+      syncWithDrive, disconnectDrive
     }}>
       {children}
     </ItemContext.Provider>

@@ -2475,3 +2475,141 @@
   height: 24px;
 }
 
+.gdriveSyncBox {
+  background-color: var(--color-gray-50);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.gdriveStatusRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.gdriveStatusLabel {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.gdriveStatusActive {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #16a34a;
+  background-color: #f0fdf4;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #bbf7d0;
+}
+
+.gdriveStatusInactive {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  background-color: var(--color-gray-100);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+}
+
+.gdriveStatusValue {
+  font-size: 0.8125rem;
+  color: var(--text-main);
+  font-family: monospace;
+}
+
+.syncErrorBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #dc2626;
+  background-color: #fef2f2;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+}
+
+.syncSuccess {
+  font-size: 0.8125rem;
+  color: #16a34a;
+  background-color: #f0fdf4;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #bbf7d0;
+}
+
+.syncError {
+  font-size: 0.8125rem;
+  color: #dc2626;
+  background-color: #fef2f2;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+}
+
+.gdriveActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.syncBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid #2563eb;
+  background-color: #2563eb;
+  color: #ffffff;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.syncBtn:hover:not(:disabled) {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.syncBtn:disabled {
+  background-color: var(--color-gray-200);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.disconnectBtn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  background-color: transparent;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.disconnectBtn:hover:not(:disabled) {
+  background-color: var(--color-gray-100);
+  color: var(--text-main);
+  border-color: var(--color-gray-300);
+}
+

@@ -9,13 +9,18 @@ import {
   Loader2, ListTodo, XCircle, AlertCircle, Settings, X, 
   FileText, Lightbulb, HelpCircle, ChevronDown, ChevronUp, Trash2,
   Play, Edit2, Hourglass, HelpCircle as HelpIcon, FileQuestion, RotateCcw,
-  Download, Upload, ShieldCheck, Database
+  Download, Upload, ShieldCheck, Database, Cloud, CloudOff, RefreshCw
 } from 'lucide-react';
 import { formatBackupDate } from '@/utils/storageManager';
 import { AppItem, TaskItem, MemoItem, InsightItem, Status, Priority, ProjectSummary } from '@/types/task';
 
 export default function Home() {
-  const { items, projectSummaries, addItem, updateItem, deleteItem, updateItems, updateProjectSummaries, updateProjectSummary, clearAll, exportData, importData, getDataCounts, restoreInfo, acceptRestore, dismissRestore } = useItems();
+  const { 
+    items, projectSummaries, addItem, updateItem, deleteItem, updateItems, 
+    updateProjectSummaries, updateProjectSummary, clearAll, exportData, 
+    importData, getDataCounts, restoreInfo, acceptRestore, dismissRestore,
+    gdriveLinked, isSyncing, lastSyncTime, syncError, syncWithDrive, disconnectDrive
+  } = useItems();
   const [inputValue, setInputValue] = useState('');
   const [isCooEvaluating, setIsCooEvaluating] = useState(false);
   const [cooMessage, setCooMessage] = useState('');
@@ -68,6 +73,9 @@ export default function Home() {
   const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Phase 4: Google Drive sync message
+  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
@@ -96,7 +104,37 @@ export default function Home() {
     setTempModelName(modelName);
     setTestStatus('idle');
     setTestErrorMessage('');
+    setImportMessage(null);
+    setSyncMessage(null);
     setShowSettings(true);
+  };
+
+  const handleSyncWithDrive = async () => {
+    setSyncMessage(null);
+    try {
+      const action = await syncWithDrive();
+      let msgText = '同期が完了しました。';
+      if (action === 'synced_to_cloud') {
+        msgText = 'ローカルの新しいデータをGoogle Driveに保存しました。';
+      } else if (action === 'loaded_from_cloud') {
+        msgText = 'Google Driveから新しいデータを読み込みました。';
+      } else if (action === 'already_up_to_date') {
+        msgText = 'データはすでに最新の状態です。';
+      }
+      setSyncMessage({ type: 'success', text: msgText });
+    } catch (err: any) {
+      setSyncMessage({ 
+        type: 'error', 
+        text: err.message || 'Google Drive同期に失敗しました。時間をおいて再度お試しください。' 
+      });
+    }
+  };
+
+  const handleDisconnectDrive = () => {
+    if (confirm('Google Driveとの連携を解除しますか？\n（ローカルのデータは削除されません）')) {
+      disconnectDrive();
+      setSyncMessage({ type: 'success', text: 'Google Driveとの連携を解除しました。' });
+    }
   };
 
   const saveSettings = () => {
@@ -499,7 +537,7 @@ export default function Home() {
           <div className={styles.modal} style={{ maxWidth: '540px' }}>
             <div className={styles.modalHeader}>
               <h3>⚙️ 設定</h3>
-              <button onClick={() => { setShowSettings(false); setImportMessage(null); }} className={styles.closeBtn}>
+              <button onClick={() => { setShowSettings(false); setImportMessage(null); setSyncMessage(null); }} className={styles.closeBtn}>
                 <X size={20} />
               </button>
             </div>
@@ -654,6 +692,81 @@ export default function Home() {
                     <Trash2 size={14} />
                     全データ削除
                   </button>
+                </div>
+              </div>
+
+              {/* ── Google Drive Sync Section ── */}
+              <div className={styles.settingsSection}>
+                <h4 className={styles.settingsSectionTitle}>
+                  <Cloud size={16} />
+                  Google Drive 同期 (PC・スマホ同期)
+                </h4>
+                <p className={styles.helpText}>
+                  個人の Google Drive を使用して、PCとスマートフォンの間でデータを安全に同期します。（APIキーは同期されません）
+                </p>
+
+                <div className={styles.gdriveSyncBox}>
+                  <div className={styles.gdriveStatusRow}>
+                    <span className={styles.gdriveStatusLabel}>ステータス:</span>
+                    {gdriveLinked ? (
+                      <span className={styles.gdriveStatusActive}>
+                        <CheckCircle2 size={14} /> 連携中
+                      </span>
+                    ) : (
+                      <span className={styles.gdriveStatusInactive}>
+                        <CloudOff size={14} /> 未連携
+                      </span>
+                    )}
+                  </div>
+
+                  {lastSyncTime && (
+                    <div className={styles.gdriveStatusRow}>
+                      <span className={styles.gdriveStatusLabel}>最終同期:</span>
+                      <span className={styles.gdriveStatusValue}>{formatBackupDate(lastSyncTime)}</span>
+                    </div>
+                  )}
+
+                  {syncError && (
+                    <div className={styles.syncErrorBox}>
+                      <AlertCircle size={14} /> {syncError}
+                    </div>
+                  )}
+
+                  {syncMessage && (
+                    <div className={syncMessage.type === 'success' ? styles.syncSuccess : styles.syncError}>
+                      {syncMessage.type === 'success' ? '✅' : '❌'} {syncMessage.text}
+                    </div>
+                  )}
+
+                  <div className={styles.gdriveActions}>
+                    <button 
+                      onClick={handleSyncWithDrive} 
+                      className={styles.syncBtn}
+                      disabled={isSyncing}
+                    >
+                      {isSyncing ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          同期中...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw size={16} />
+                          {gdriveLinked ? '今すぐ同期' : 'Google Driveと連携して同期'}
+                        </>
+                      )}
+                    </button>
+
+                    {gdriveLinked && (
+                      <button 
+                        onClick={handleDisconnectDrive} 
+                        className={styles.disconnectBtn}
+                        disabled={isSyncing}
+                      >
+                        連携解除
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
