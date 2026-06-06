@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity="0.2" />
+    </filter>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="120" fill="url(#blueGradient)" />
+  
+  <!-- Abstract Dashboard/Checkmark Graphic -->
+  <g filter="url(#shadow)" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Checkmark -->
+    <path d="M150 270 L230 350 L380 180" stroke-width="48" />
+    <!-- Sparkle/Brain indicator -->
+    <circle cx="380" cy="140" r="16" fill="#ffffff" stroke="none" />
+  </g>
+</svg>
