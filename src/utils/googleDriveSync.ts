@@ -284,9 +284,14 @@ export async function syncWithGoogleDrive(
 
   // 1. Search for the file in Google Drive
   const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='ai-coo-data.json'+and+trashed=false&spaces=drive&fields=files(id,name,modifiedTime)`,
+    `https://www.googleapis.com/drive/v3/files?q=name='ai-coo-data.json'+and+trashed=false&spaces=drive&fields=files(id,name,modifiedTime)&t=${Date.now()}`,
     {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      cache: 'no-store'
     }
   );
 
@@ -332,8 +337,13 @@ export async function syncWithGoogleDrive(
   const fileId = file.id;
 
   // 2. Download the existing file's media content
-  const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&t=${Date.now()}`, {
+    headers: { 
+      Authorization: `Bearer ${token}`,
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    },
+    cache: 'no-store'
   });
 
   if (!downloadRes.ok) {
