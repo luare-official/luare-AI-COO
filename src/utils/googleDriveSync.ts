@@ -181,10 +181,60 @@ async function updateFile(token: string, fileId: string, data: StorageData): Pro
 }
 
 /**
+ * Merge local and cloud storage data.
+ */
+function mergeStorageData(local: StorageData, cloud: StorageData): StorageData {
+  const mergedItemsMap = new Map<string, any>();
+  
+  // 1. Put all cloud items first
+  (cloud.items || []).forEach(item => {
+    if (item && item.id) {
+      mergedItemsMap.set(item.id, item);
+    }
+  });
+
+  // 2. Put local items, overwrite only if local item is newer
+  (local.items || []).forEach(item => {
+    if (item && item.id) {
+      const existing = mergedItemsMap.get(item.id);
+      if (!existing || (item.updatedAt || 0) > (existing.updatedAt || 0)) {
+        mergedItemsMap.set(item.id, item);
+      }
+    }
+  });
+
+  // 3. Merge project summaries
+  const mergedSummariesMap = new Map<string, any>();
+  (cloud.projectSummaries || []).forEach(s => {
+    if (s && s.projectName) {
+      mergedSummariesMap.set(s.projectName, s);
+    }
+  });
+  (local.projectSummaries || []).forEach(s => {
+    if (s && s.projectName) {
+      const existing = mergedSummariesMap.get(s.projectName);
+      if (!existing || (s.progressRate || 0) > (existing.progressRate || 0)) {
+        mergedSummariesMap.set(s.projectName, s);
+      }
+    }
+  });
+
+  return {
+    schemaVersion: Math.max(local.schemaVersion || 0, cloud.schemaVersion || 0),
+    savedAt: Date.now(),
+    items: Array.from(mergedItemsMap.values()),
+    projectSummaries: Array.from(mergedSummariesMap.values()),
+  };
+}
+
+/**
  * Synchronize local data with Google Drive.
  */
-export async function syncWithGoogleDrive(localData: StorageData): Promise<{
-  action: 'synced_to_cloud' | 'loaded_from_cloud' | 'already_up_to_date';
+export async function syncWithGoogleDrive(
+  localData: StorageData,
+  isFirstSync: boolean = false
+): Promise<{
+  action: 'synced_to_cloud' | 'loaded_from_cloud' | 'merged_data' | 'already_up_to_date';
   cloudData?: StorageData;
 }> {
   const token = await getAccessToken();
@@ -230,7 +280,29 @@ export async function syncWithGoogleDrive(localData: StorageData): Promise<{
     return { action: 'synced_to_cloud' };
   }
 
-  // 3. Compare savedAt timestamps
+  // 3. Count data items
+  const localCount = localData.items?.length || 0;
+  const cloudCount = cloudData.items?.length || 0;
+
+  // Safeguard 1: If cloud is empty and local has data, always write local to cloud
+  if (localCount > 0 && cloudCount === 0) {
+    await updateFile(token, fileId, localData);
+    return { action: 'synced_to_cloud' };
+  }
+
+  // Safeguard 2: If local is empty and cloud has data, download cloud to local
+  if (localCount === 0 && cloudCount > 0) {
+    return { action: 'loaded_from_cloud', cloudData };
+  }
+
+  // Safeguard 3: If it's the first sync and both have data, merge them
+  if (isFirstSync && localCount > 0 && cloudCount > 0) {
+    const merged = mergeStorageData(localData, cloudData);
+    await updateFile(token, fileId, merged);
+    return { action: 'merged_data', cloudData: merged };
+  }
+
+  // 4. Otherwise compare savedAt timestamps
   const localTime = localData.savedAt || 0;
   const cloudTime = cloudData.savedAt || 0;
 

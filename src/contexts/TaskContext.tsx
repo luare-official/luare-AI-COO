@@ -29,7 +29,7 @@ interface ItemContextType {
   isSyncing: boolean;
   lastSyncTime: number | null;
   syncError: string | null;
-  syncWithDrive: () => Promise<'synced_to_cloud' | 'loaded_from_cloud' | 'already_up_to_date' | void>;
+  syncWithDrive: () => Promise<'synced_to_cloud' | 'loaded_from_cloud' | 'merged_data' | 'already_up_to_date' | void>;
   disconnectDrive: () => void;
 }
 
@@ -248,9 +248,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         projectSummaries: [],
       };
 
-      const result = await gdrive.syncWithGoogleDrive(localData);
+      const isFirstSync = lastSyncTime === null;
+      const result = await gdrive.syncWithGoogleDrive(localData, isFirstSync);
 
-      if (result.action === 'loaded_from_cloud' && result.cloudData) {
+      if ((result.action === 'loaded_from_cloud' || result.action === 'merged_data') && result.cloudData) {
+        // Create safety backup of current local data before overwriting
+        storage.createSafetyBackup();
+        
         setItems(result.cloudData.items || []);
         setProjectSummaries(result.cloudData.projectSummaries || []);
         storage.save(result.cloudData.items || [], result.cloudData.projectSummaries || []);
@@ -269,7 +273,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       setIsSyncing(false);
       throw err;
     }
-  }, [items, projectSummaries, GOOGLE_CLIENT_ID]);
+  }, [items, projectSummaries, GOOGLE_CLIENT_ID, lastSyncTime]);
 
   // Disconnect function
   const disconnectDrive = useCallback(() => {

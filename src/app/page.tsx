@@ -115,11 +115,13 @@ export default function Home() {
       const action = await syncWithDrive();
       let msgText = '同期が完了しました。';
       if (action === 'synced_to_cloud') {
-        msgText = 'ローカルの新しいデータをGoogle Driveに保存しました。';
+        msgText = 'ローカルをGoogle Driveへ保存しました';
       } else if (action === 'loaded_from_cloud') {
-        msgText = 'Google Driveから新しいデータを読み込みました。';
+        msgText = 'Google Driveから読み込みました';
+      } else if (action === 'merged_data') {
+        msgText = 'ローカルとGoogle Driveをマージしました';
       } else if (action === 'already_up_to_date') {
-        msgText = 'データはすでに最新の状態です。';
+        msgText = 'データは最新です';
       }
       setSyncMessage({ type: 'success', text: msgText });
     } catch (err: any) {
