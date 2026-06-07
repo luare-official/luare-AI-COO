@@ -37,6 +37,7 @@ export interface TaskItem extends BaseItem {
   targetDate?: string | null;     // 自分用目標期限
   manualAdhdMinutes?: number;     // 手動補正されたADHD工数 (分単位)
   manualRiskLevel?: 'green' | 'yellow' | 'red'; // 手動補正された危険度
+  isEstimatedMinutesManual?: boolean; // 手動で入力された工数かどうかのフラグ
 }
 
 export interface MemoItem extends BaseItem {

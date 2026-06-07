@@ -146,7 +146,8 @@ export async function cooPrioritizeClientSide(items: AppItem[], apiKey: string, 
        3. 「6月8日」「6/8」のように年がない日付は、現在日（${currentTodayStr}）以降の最も近い未来日として解釈してください。
        4. もし現在年のその日付がすでに過去なら、翌年（${y + 1}年など）として扱ってください。
        5. 期限が不明なタスクは、無理に日付を作らず \`null\` にしてください。
-     - **想定工数 (estimatedMinutes)**: 作業完了に必要な想定時間（分単位の数値。例：30分なら 30, 2時間なら 120, 8時間なら 480。不明なら30）。
+     - **想定工数 (estimatedMinutes)**: 作業完了に必要な想定時間（分単位の数値。例：30分なら 30, 2時間なら 120, 8時間なら 480。不明なら30）。ユーザーがテキスト内で工数を指定している場合はその値を採用してください。
+     - **手動工数フラグ (isEstimatedMinutesManual)**: ユーザーがテキスト内で工数を指定している場合は true、AIが推定した場合は false にしてください。
      - **待機日数 (waitingDays)**: 外部の承認、配送、審査などを「待つ」だけの待機リードタイム（日数の数値。例：GS1申請審査なら 12, 誰かからの回答待ちなら 3。待機不要なら0）。
      - **ボトルネック (bottleneck)**: 待機必要であれば、その具体的な原因・待ち相手（例: "GS1審査待ち", "夫の確認待ち" など。不要なら null）。
      - **「今やらないリスト」への選定**: 「今月はやらなくて良い」と判断したタスクは、statusを "not-doing-now" に変更してください。脳内メモリを空けるため、緊急でないものは積極的に落としてください。
@@ -185,6 +186,7 @@ ${JSON.stringify(itemsPayload, null, 2)}
       "score": スコア数値0〜100 (taskの場合のみ),
       "reason": "評価理由やCOOのアドバイス" (taskの場合のみ),
       "estimatedMinutes": 推定作業時間(数値、分単位) (taskの場合のみ),
+      "isEstimatedMinutesManual": ユーザー指定ならtrue, AI推定ならfalse (taskの場合のみ),
       "waitingDays": 推定待機日数(数値) (taskの場合のみ),
       "bottleneck": "待機理由" | null (taskの場合のみ)
     }
@@ -204,6 +206,7 @@ ${JSON.stringify(itemsPayload, null, 2)}
       "score": スコア数値0〜100,
       "reason": "抽出された理由やCOOのアドバイス",
       "estimatedMinutes": 推定作業時間(数値、分単位),
+      "isEstimatedMinutesManual": ユーザー指定ならtrue, AI推定ならfalse,
       "waitingDays": 推定待機日数(数値),
       "bottleneck": "待機理由" | null
     }

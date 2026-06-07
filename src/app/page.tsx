@@ -66,7 +66,6 @@ export default function Home() {
   const [editPriority, setEditPriority] = useState<Priority>('medium');
   const [editStatus, setEditStatus] = useState<Status>('pending');
   const [editTargetDate, setEditTargetDate] = useState('');
-  const [editManualAdhdMinutes, setEditManualAdhdMinutes] = useState('');
   const [editManualRiskLevel, setEditManualRiskLevel] = useState<'green' | 'yellow' | 'red' | ''>('');
 
   // Phase 3-2: Import state
@@ -319,7 +318,6 @@ export default function Home() {
     setEditPriority(task.priority || 'medium');
     setEditStatus(task.status || 'pending');
     setEditTargetDate(task.targetDate || '');
-    setEditManualAdhdMinutes(task.manualAdhdMinutes?.toString() || '');
     setEditManualRiskLevel(task.manualRiskLevel || '');
   };
 
@@ -339,6 +337,9 @@ export default function Home() {
 
     const isDeadlineChanged = editDeadline !== (editingTask.deadline || '');
     const isDeadlineHandEdited = isDeadlineChanged ? true : editingTask.isDeadlineHandEdited;
+    
+    const isEstimatedMinutesChanged = editEstimatedMinutes !== (editingTask.estimatedMinutes?.toString() || '');
+    const isEstimatedMinutesManual = isEstimatedMinutesChanged ? true : editingTask.isEstimatedMinutesManual;
 
     updateItem(editingTask.id, {
       title: editTitle,
@@ -346,6 +347,7 @@ export default function Home() {
       deadline: editDeadline || null,
       isDeadlineHandEdited: isDeadlineHandEdited,
       estimatedMinutes: editEstimatedMinutes ? Number(editEstimatedMinutes) : undefined,
+      isEstimatedMinutesManual: isEstimatedMinutesManual,
       actualMinutes: editActualMinutes ? Number(editActualMinutes) : 0,
       waitingDays: newWaitingDays || undefined,
       waitingSince: waitingSince,
@@ -354,7 +356,6 @@ export default function Home() {
       priority: editPriority as Priority,
       status: editStatus as Status,
       targetDate: editTargetDate || null,
-      manualAdhdMinutes: editManualAdhdMinutes ? Number(editManualAdhdMinutes) : undefined,
       manualRiskLevel: editManualRiskLevel || undefined,
     });
     
@@ -922,22 +923,6 @@ export default function Home() {
 
               <div className={styles.formRow}>
                 <div className={styles.inputGroup}>
-                  <label>手動補正ADHD工数 (分):</label>
-                  <input
-                    type="number"
-                    value={editManualAdhdMinutes}
-                    onChange={(e) => setEditManualAdhdMinutes(e.target.value)}
-                    placeholder="空欄で自動補正値を適用"
-                    className={styles.modalInput}
-                  />
-                  {!editManualAdhdMinutes && editEstimatedMinutes && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      自動補正予測: {Number(editEstimatedMinutes) <= 120 ? Number(editEstimatedMinutes) * 2 : Math.round(Number(editEstimatedMinutes) * 1.5)}分
-                    </span>
-                  )}
-                </div>
-                
-                <div className={styles.inputGroup}>
                   <label>手動危険度補正:</label>
                   <select 
                     value={editManualRiskLevel} 
@@ -1074,7 +1059,7 @@ export default function Home() {
           className={`${styles.tabBtn} ${activeTab === 'all' ? styles.activeTab : ''}`}
           onClick={() => setActiveTab('all')}
         >
-          全タスク
+          完了済み
         </button>
         <button 
           className={`${styles.tabBtn} ${activeTab === 'memo-insight' ? styles.activeTab : ''}`}
@@ -1549,172 +1534,64 @@ export default function Home() {
               )}
             </div>
 
-            {/* Top 5 Blocked Tasks */}
-            {activeProjects.length > 0 && (
-              <div className={styles.execTopBlockedCard} style={{ marginTop: '24px' }}>
-                <h3 className={styles.execSectionTitle}>🚨 事業を止めている案件 TOP 5</h3>
-                <div className={styles.blockedRankList}>
-                  {top5Blocked.length > 0 ? (
-                    top5Blocked.map((task, idx) => (
-                      <div key={task.id} className={styles.blockedRankItem} onClick={() => handleStartEdit(task)}>
-                        <div className={styles.rankBadge}>#{idx + 1}</div>
-                        <div className={styles.blockedItemInfo}>
-                          <div className={styles.blockedItemHeader}>
-                            <span className={styles.blockedItemTitle}>{task.title}</span>
-                            {task.cooScore !== undefined && (
-                              <span className={styles.blockedItemScore}>スコア: {task.cooScore}</span>
-                            )}
-                          </div>
-                          <div className={styles.blockedItemSub}>
-                            <span className={styles.blockedItemProj}>{task.project}</span>
-                            <span className={styles.blockedItemReason}>🛑 原因: <strong>{task.bottleneck}</strong></span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className={styles.noBlockages}>
-                      🎉 現在、進行を止めている（ボトルネックありの）タスクはありません。
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {/* TAB 1: TODAY'S FOCUS */}
         {activeTab === 'today' && (
-          <>
-            {/* 2. ボトルネック・待機中一覧 */}
-            {waitingTasks.length > 0 && (
-              <section className={styles.section}>
-                <h2 className={`${styles.sectionTitle} ${styles.dangerTitle}`}>
-                  <Hourglass size={16} /> 待機中・ボトルネック一覧
-                </h2>
-                <div className={styles.taskList}>
-                  {waitingTasks.map(task => {
-                    const remaining = getRemainingWaitingDays(task);
-                    return (
-                      <div key={task.id} className={styles.waitingCard} onClick={() => handleStartEdit(task)}>
-                        <div className={styles.waitingHeader}>
-                          <span className={styles.waitingAlert}>
-                            ⚠️ {task.bottleneck || '外部処理待ち'}
-                          </span>
-                          <span className={`${styles.waitingProgress} ${remaining === 0 ? styles.waitingAlertRed : ''}`}>
-                            {remaining === 0 ? '待ち期間終了！' : `残り ${remaining}日 / ${task.waitingDays}日中`}
-                          </span>
-                        </div>
-                        <p className={styles.waitingTitle}>{task.title}</p>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
-                          <span className={styles.waitingProject}>{task.project}</span>
-                          {task.deadline && task.deadline < todayStr && (
-                            <span className={styles.badgeAlertMini}>⚠️過去/期限切れ: {task.deadline}</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            <section className={styles.section}>
-              <h2 className={`${styles.sectionTitle} ${styles.sectionTitleTop}`}>
-                <Sparkles size={16} /> 今日やるべき TOP 3
-              </h2>
-              <div className={styles.taskList}>
-                {todayTop3.length > 0 ? (
-                  todayTop3.map(task => (
-                    <TaskCard key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onNotNow={() => toggleNotDoingNow(task)} onDelete={() => deleteItem(task.id)} onEdit={() => handleStartEdit(task)} todayStr={todayStr} />
-                  ))
-                ) : (
-                  <div className={styles.emptyState}>
-                    今日やるべきTOP3はありません。「AI COOに整理してもらう」を押すか、タスクを追加してください。
+          <section className={styles.section}>
+            <h2 className={`${styles.sectionTitle} ${styles.sectionTitleTop}`}>
+              <Sparkles size={16} /> 今日のフォーカス (優先順)
+            </h2>
+            <div className={styles.taskList}>
+              {(() => {
+                const pendingTasksWithScore = pendingTasks.map(task => ({
+                  task,
+                  score: calculatePriorityScore(task, todayStr)
+                }));
+                
+                pendingTasksWithScore.sort((a, b) => b.score - a.score);
+                
+                if (pendingTasksWithScore.length === 0) {
+                  return (
+                    <div className={styles.emptyState}>
+                      未完了のタスクはありません。素晴らしいですね！
+                    </div>
+                  );
+                }
+                
+                return pendingTasksWithScore.map((item, idx) => (
+                  <div key={item.task.id} className={styles.top3Card} style={{ marginBottom: '12px' }} onClick={() => handleStartEdit(item.task)}>
+                    <div className={styles.top3CardHeader}>
+                      <span className={styles.top3Rank}>#{idx + 1}</span>
+                      <span className={styles.top3ProjectName}>{item.task.project}</span>
+                    </div>
+                    <h4 className={styles.top3CardTitle}>{item.task.title}</h4>
+                    <div className={styles.top3CardFooter}>
+                      <span className={styles.top3Score}>優先スコア{item.score}</span>
+                      <span className={styles.top3EditLink}>詳細・編集 ↗</span>
+                    </div>
                   </div>
-                )}
-              </div>
-            </section>
-
-            {dueSoonTasks.length > 0 && (
-              <section className={styles.section}>
-                <h2 className={styles.sectionTitle}>
-                  <Clock size={16} /> 期限が近い案件
-                </h2>
-                <div className={styles.taskList}>
-                  {dueSoonTasks.map(task => (
-                    <TaskCard key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onNotNow={() => toggleNotDoingNow(task)} onDelete={() => deleteItem(task.id)} onEdit={() => handleStartEdit(task)} todayStr={todayStr} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {husbandTasks.length > 0 && (
-              <section className={styles.section}>
-                <h2 className={styles.sectionTitle}>
-                  <User size={16} /> 夫からの依頼
-                </h2>
-                <div className={styles.taskList}>
-                  {husbandTasks.map(task => (
-                    <TaskCard key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onNotNow={() => toggleNotDoingNow(task)} onDelete={() => deleteItem(task.id)} onEdit={() => handleStartEdit(task)} todayStr={todayStr} />
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
+                ));
+              })()}
+            </div>
+          </section>
         )}
 
-        {/* TAB 2: ALL TASKS */}
+        {/* TAB 2: COMPLETED TASKS */}
         {activeTab === 'all' && (
-          <>
-            {stalledTasks.length > 0 && (
-              <section className={styles.section}>
-                <h2 className={`${styles.sectionTitle} ${styles.dangerTitle}`}>
-                  <AlertCircle size={16} /> 停滞案件 (14日以上更新なし)
-                </h2>
-                <div className={styles.taskList}>
-                  {stalledTasks.map(task => (
-                    <TaskCard key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onNotNow={() => toggleNotDoingNow(task)} onDelete={() => deleteItem(task.id)} onEdit={() => handleStartEdit(task)} todayStr={todayStr} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>保留中タスク</h2>
-              <div className={styles.taskList}>
-                {otherPendingTasks.length > 0 ? (
-                  otherPendingTasks.map(task => (
-                    <TaskCard key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onNotNow={() => toggleNotDoingNow(task)} onDelete={() => deleteItem(task.id)} onEdit={() => handleStartEdit(task)} todayStr={todayStr} />
-                  ))
-                ) : (
-                  <div className={styles.emptyState}>保留中のタスクはありません。</div>
-                )}
-              </div>
-            </section>
-
-            {notDoingNowTasks.length > 0 && (
-              <section className={styles.section}>
-                <h2 className={styles.sectionTitle} style={{ color: 'var(--text-muted)' }}>今やらないリスト（今月対象外）</h2>
-                <div className={styles.taskList}>
-                  {notDoingNowTasks.map(task => (
-                    <TaskCard key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onNotNow={() => toggleNotDoingNow(task)} onDelete={() => deleteItem(task.id)} onEdit={() => handleStartEdit(task)} todayStr={todayStr} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {completedTasks.length > 0 && (
-              <section className={styles.section}>
-                <h2 className={styles.sectionTitle} style={{ color: 'var(--text-muted)' }}>完了済み</h2>
-                <div className={styles.taskList} style={{ opacity: 0.6 }}>
-                  {completedTasks.map(task => (
-                    <TaskCard key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onNotNow={() => toggleNotDoingNow(task)} onDelete={() => deleteItem(task.id)} onEdit={() => handleStartEdit(task)} todayStr={todayStr} />
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle} style={{ color: 'var(--text-muted)' }}>完了済み</h2>
+            <div className={styles.taskList} style={{ opacity: 0.6 }}>
+              {completedTasks.length > 0 ? (
+                completedTasks.map(task => (
+                  <TaskCard key={task.id} task={task} onToggle={() => toggleTaskStatus(task)} onNotNow={() => toggleNotDoingNow(task)} onDelete={() => deleteItem(task.id)} onEdit={() => handleStartEdit(task)} todayStr={todayStr} />
+                ))
+              ) : (
+                <div className={styles.emptyState}>完了済みのタスクはありません。</div>
+              )}
+            </div>
+          </section>
         )}
 
         {/* TAB 3: MEMO & INSIGHT */}
@@ -2085,30 +1962,29 @@ function TaskCard({
           </span>
         )}
         {task.estimatedMinutes && (
-          <span className={`${styles.badge} ${styles.badgeEstimated}`}>
-            ⏳標準工数: {formatTime(task.estimatedMinutes)}
-            {task.actualMinutes ? ` (実績: ${formatTime(task.actualMinutes)})` : ''}
+          <span className={`${styles.badge} ${styles.badgeEstimated}`} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', padding: '4px 8px', lineHeight: '1.4' }}>
+            <span style={{ fontWeight: 'bold' }}>
+              ⏳想定工数: {formatTime(getFinalEstimatedMinutes(task))}
+              {task.isEstimatedMinutesManual || task.manualAdhdMinutes !== undefined 
+                ? '（手動入力）' 
+                : '（AI推定）'}
+            </span>
+            {!(task.isEstimatedMinutesManual || task.manualAdhdMinutes !== undefined) && (
+              <span style={{ fontSize: '0.85em', opacity: 0.8 }}>
+                ※標準{formatTime(task.estimatedMinutes)}＋ADHD補正
+              </span>
+            )}
+            {task.actualMinutes ? <span style={{ fontSize: '0.85em', opacity: 0.8 }}>(実績: {formatTime(task.actualMinutes)})</span> : null}
           </span>
         )}
-        {(() => {
-          const adhdMin = getActiveAdhdMinutes(task);
-          if (adhdMin) {
-            return (
-              <span className={`${styles.badge} ${styles.badgeAdhdEstimated}`}>
-                🧠 ADHD工数: {formatTime(adhdMin)}
-              </span>
-            );
-          }
-          return null;
-        })()}
         {task.waitingDays && task.status === 'pending' && (
           <span className={`${styles.badge} ${styles.badgeWaiting}`}>
             🛑 待ち: {task.bottleneck || '外部処理'}
           </span>
         )}
-        {task.cooScore !== undefined && task.status === 'pending' && (
+        {task.status === 'pending' && (
           <span className={styles.badge} style={{ backgroundColor: 'var(--primary-bg)', color: 'var(--accent)' }}>
-            優先スコア: {task.cooScore}
+            優先スコア: {calculatePriorityScore(task, todayStr)}
           </span>
         )}
       </div>
@@ -2192,10 +2068,12 @@ const formatMinutesToHours = (minutes: number) => {
   return m > 0 ? `${h}時間 ${m}分` : `${h}時間`;
 };
 
-// Helper to calculate ADHD corrected minutes
-const getActiveAdhdMinutes = (task: TaskItem) => {
-  if (task.manualAdhdMinutes !== undefined) return task.manualAdhdMinutes;
+// Helper to calculate final estimated minutes (respects manual input)
+const getFinalEstimatedMinutes = (task: TaskItem) => {
   if (!task.estimatedMinutes) return undefined;
+  if (task.isEstimatedMinutesManual || task.manualAdhdMinutes !== undefined) {
+    return task.manualAdhdMinutes !== undefined ? task.manualAdhdMinutes : task.estimatedMinutes;
+  }
   
   const est = task.estimatedMinutes;
   if (est <= 120) {
@@ -2225,6 +2103,35 @@ const getActiveTaskRiskLevel = (task: TaskItem, todayStr: string) => {
   }
   
   return 'green';
+};
+
+// Helper to calculate Priority Score client-side
+const calculatePriorityScore = (task: TaskItem, todayStr: string) => {
+  let score = 0;
+  
+  // 1. Risk Level (Deadline proximity)
+  const risk = getActiveTaskRiskLevel(task, todayStr);
+  if (risk === 'red') score += 50;
+  else if (risk === 'yellow') score += 20;
+  
+  // 2. Waiting status
+  if (task.waitingDays && task.waitingDays > 0) {
+    score -= 40; // Deprioritize waiting tasks
+  } else if (task.bottleneck) {
+    score -= 20; // Deprioritize tasks with bottlenecks
+  }
+  
+  // 3. Profit Impact (Project Importance)
+  if (task.profitImpact === 'High') score += 25;
+  else if (task.profitImpact === 'Medium') score += 10;
+  
+  // 4. Estimated Effort (Quick wins)
+  const estMin = getFinalEstimatedMinutes(task) || 60;
+  if (estMin <= 30) score += 15;
+  else if (estMin <= 120) score += 5;
+  
+  // Normalize score between 0 and 100
+  return Math.max(0, Math.min(100, score));
 };
 
 // Helper to determine CSS Grid column offset in Gantt chart for target date and absolute deadline overlays
