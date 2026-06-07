@@ -541,7 +541,7 @@ export default function Home() {
                 <X size={20} />
               </button>
             </div>
-            <div className={styles.modalBody}>
+            <div className={styles.modalBody} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
 
               {/* ── API Settings Section ── */}
               <div className={styles.settingsSection}>
