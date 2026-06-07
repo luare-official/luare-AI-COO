@@ -1,11 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppItem, ItemType, ProjectSummary } from '@/types/task';
 import { v4 as uuidv4 } from 'uuid';
 import * as storage from '@/utils/storageManager';
 import type { RestoreInfo, DataCounts } from '@/utils/storageManager';
 import * as gdrive from '@/utils/googleDriveSync';
+
+export type AutoSyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
 interface ItemContextType {
   items: AppItem[];
@@ -29,6 +31,7 @@ interface ItemContextType {
   isSyncing: boolean;
   lastSyncTime: number | null;
   syncError: string | null;
+  autoSyncStatus: AutoSyncStatus;
   syncWithDrive: () => Promise<'synced_to_cloud' | 'loaded_from_cloud' | 'merged_data' | 'already_up_to_date' | void>;
   disconnectDrive: () => void;
 }
@@ -210,6 +213,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [autoSyncStatus, setAutoSyncStatus] = useState<AutoSyncStatus>('idle');
+  const skipAutoSyncRef = useRef(false);
+  const hasInitialSyncRun = useRef(false);
+  const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize GIS on mount
   useEffect(() => {
@@ -255,6 +262,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         // Create safety backup of current local data before overwriting
         storage.createSafetyBackup();
         
+        skipAutoSyncRef.current = true;
         setItems(result.cloudData.items || []);
         setProjectSummaries(result.cloudData.projectSummaries || []);
         storage.save(result.cloudData.items || [], result.cloudData.projectSummaries || []);
@@ -275,6 +283,54 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, projectSummaries, GOOGLE_CLIENT_ID, lastSyncTime]);
 
+  // Phase 4: Initial Auto Sync on mount
+  useEffect(() => {
+    if (gdriveLinked && !hasInitialSyncRun.current) {
+      hasInitialSyncRun.current = true;
+      setAutoSyncStatus('syncing');
+      syncWithDrive()
+        .then(() => {
+          setAutoSyncStatus('success');
+          setTimeout(() => setAutoSyncStatus('idle'), 3000);
+        })
+        .catch(() => {
+          setAutoSyncStatus('error');
+          setTimeout(() => setAutoSyncStatus('idle'), 5000);
+        });
+    }
+  }, [gdriveLinked, syncWithDrive]);
+
+  // Phase 4: Debounced Auto Sync on data change
+  useEffect(() => {
+    if (!isLoaded || !gdriveLinked) return;
+
+    if (skipAutoSyncRef.current) {
+      skipAutoSyncRef.current = false;
+      return;
+    }
+
+    if (autoSyncTimerRef.current) {
+      clearTimeout(autoSyncTimerRef.current);
+    }
+
+    autoSyncTimerRef.current = setTimeout(() => {
+      setAutoSyncStatus('syncing');
+      syncWithDrive()
+        .then(() => {
+          setAutoSyncStatus('success');
+          setTimeout(() => setAutoSyncStatus('idle'), 3000);
+        })
+        .catch(() => {
+          setAutoSyncStatus('error');
+          setTimeout(() => setAutoSyncStatus('idle'), 5000);
+        });
+    }, 4000);
+
+    return () => {
+      if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current);
+    };
+  }, [items, projectSummaries, isLoaded, gdriveLinked, syncWithDrive]);
+
   // Disconnect function
   const disconnectDrive = useCallback(() => {
     gdrive.disconnectGoogleDrive();
@@ -291,7 +347,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       updateProjectSummaries, updateProjectSummary, clearAll,
       exportData, importData, getDataCounts: getDataCountsFn,
       restoreInfo, acceptRestore, dismissRestore,
-      gdriveLinked, isSyncing, lastSyncTime, syncError,
+      gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus,
       syncWithDrive, disconnectDrive
     }}>
       {children}

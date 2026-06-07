@@ -19,7 +19,7 @@ export default function Home() {
     items, projectSummaries, addItem, updateItem, deleteItem, updateItems, 
     updateProjectSummaries, updateProjectSummary, clearAll, exportData, 
     importData, getDataCounts, restoreInfo, acceptRestore, dismissRestore,
-    gdriveLinked, isSyncing, lastSyncTime, syncError, syncWithDrive, disconnectDrive
+    gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus, syncWithDrive, disconnectDrive
   } = useItems();
   const [inputValue, setInputValue] = useState('');
   const [isCooEvaluating, setIsCooEvaluating] = useState(false);
@@ -497,6 +497,18 @@ export default function Home() {
           AI COO
         </h1>
         <div className={styles.headerRight}>
+          {autoSyncStatus !== 'idle' && (
+            <div className={`${styles.autoSyncBadge} ${styles[autoSyncStatus]}`}>
+              {autoSyncStatus === 'syncing' && <RefreshCw size={14} className={styles.spin} />}
+              {autoSyncStatus === 'success' && <CheckCircle2 size={14} />}
+              {autoSyncStatus === 'error' && <AlertCircle size={14} />}
+              <span>
+                {autoSyncStatus === 'syncing' && '同期中...'}
+                {autoSyncStatus === 'success' && '同期完了'}
+                {autoSyncStatus === 'error' && '同期失敗'}
+              </span>
+            </div>
+          )}
           {unclassified.length > 0 && (
             <div className={styles.unclassifiedBadge}>
               <AlertCircle size={14} />

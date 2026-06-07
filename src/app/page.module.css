@@ -51,6 +51,45 @@
   border: 1px solid var(--color-blue-200);
 }
 
+.autoSyncBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.autoSyncBadge.syncing {
+  color: var(--accent);
+  background-color: var(--primary-bg);
+  border-color: var(--color-blue-200);
+}
+
+.autoSyncBadge.success {
+  color: #15803d;
+  background-color: #dcfce7;
+  border-color: #bbf7d0;
+}
+
+.autoSyncBadge.error {
+  color: #b91c1c;
+  background-color: #fee2e2;
+  border-color: #fecaca;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .settingsBtn {
   background: transparent;
   border: none;
