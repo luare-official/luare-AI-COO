@@ -60,8 +60,15 @@ export function initGoogleDriveSync(clientId: string): Promise<void> {
         if (response.access_token) {
           // Token obtained successfully
           const expiresAt = Date.now() + (response.expires_in || 3600) * 1000;
-          sessionStorage.setItem('gdrive_access_token', response.access_token);
-          sessionStorage.setItem('gdrive_token_expires_at', String(expiresAt));
+          
+          const keepLogin = localStorage.getItem('keep_google_login') !== 'false';
+          if (keepLogin) {
+            localStorage.setItem('gdrive_access_token', response.access_token);
+            localStorage.setItem('gdrive_token_expires_at', String(expiresAt));
+          } else {
+            sessionStorage.setItem('gdrive_access_token', response.access_token);
+            sessionStorage.setItem('gdrive_token_expires_at', String(expiresAt));
+          }
           localStorage.setItem('gdrive_is_linked', 'true');
 
           if (resolveTokenPromise) {
@@ -69,7 +76,7 @@ export function initGoogleDriveSync(clientId: string): Promise<void> {
           }
         } else {
           if (rejectTokenPromise) {
-            rejectTokenPromise(new Error('アクセストークンを取得できませんでした。'));
+            rejectTokenPromise(new Error('AUTH_REQUIRED'));
           }
         }
       },
@@ -80,13 +87,20 @@ export function initGoogleDriveSync(clientId: string): Promise<void> {
 /**
  * Retrieve or request a valid access token.
  */
-export function getAccessToken(): Promise<string> {
+export function getAccessToken(interactive: boolean = true): Promise<string> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('ブラウザ環境でのみ実行可能です。'));
   }
 
-  const token = sessionStorage.getItem('gdrive_access_token');
-  const expiresAtStr = sessionStorage.getItem('gdrive_token_expires_at');
+  const keepLogin = localStorage.getItem('keep_google_login') !== 'false';
+  const token = keepLogin
+    ? localStorage.getItem('gdrive_access_token') || sessionStorage.getItem('gdrive_access_token')
+    : sessionStorage.getItem('gdrive_access_token');
+  
+  const expiresAtStr = keepLogin
+    ? localStorage.getItem('gdrive_token_expires_at') || sessionStorage.getItem('gdrive_token_expires_at')
+    : sessionStorage.getItem('gdrive_token_expires_at');
+    
   const expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : 0;
 
   // If token exists and is valid for at least another minute
@@ -101,8 +115,14 @@ export function getAccessToken(): Promise<string> {
   return new Promise((resolve, reject) => {
     resolveTokenPromise = resolve;
     rejectTokenPromise = reject;
-    // Request access token (opens Google accounts dialog)
-    tokenClient.requestAccessToken();
+    
+    if (interactive) {
+      // Request access token (opens Google accounts dialog)
+      tokenClient.requestAccessToken();
+    } else {
+      // Try silent authentication. Will return an error via callback if interaction is required.
+      tokenClient.requestAccessToken({ prompt: 'none' });
+    }
   });
 }
 
@@ -113,6 +133,8 @@ export function disconnectGoogleDrive(): void {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem('gdrive_access_token');
   sessionStorage.removeItem('gdrive_token_expires_at');
+  localStorage.removeItem('gdrive_access_token');
+  localStorage.removeItem('gdrive_token_expires_at');
   localStorage.removeItem('gdrive_is_linked');
 }
 
@@ -232,12 +254,13 @@ function mergeStorageData(local: StorageData, cloud: StorageData): StorageData {
  */
 export async function syncWithGoogleDrive(
   localData: StorageData,
-  isFirstSync: boolean = false
+  isFirstSync: boolean = false,
+  interactive: boolean = true
 ): Promise<{
   action: 'synced_to_cloud' | 'loaded_from_cloud' | 'merged_data' | 'already_up_to_date';
   cloudData?: StorageData;
 }> {
-  const token = await getAccessToken();
+  const token = await getAccessToken(interactive);
 
   // 1. Search for the file in Google Drive
   const searchRes = await fetch(

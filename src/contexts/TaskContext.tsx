@@ -245,7 +245,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   }, [GOOGLE_CLIENT_ID]);
 
   // Sync function
-  const syncWithDrive = useCallback(async () => {
+  const syncWithDrive = useCallback(async (interactive: boolean = true) => {
     if (!GOOGLE_CLIENT_ID) {
       const errMessage = 'Google Client ID が設定されていません。.env.local を確認してください。';
       setSyncError(errMessage);
@@ -266,7 +266,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
       const lastSync = localStorage.getItem('gdrive_last_sync_time');
       const isFirstSync = !lastSync;
-      const result = await gdrive.syncWithGoogleDrive(localData, isFirstSync);
+      const result = await gdrive.syncWithGoogleDrive(localData, isFirstSync, interactive);
 
       if ((result.action === 'loaded_from_cloud' || result.action === 'merged_data') && result.cloudData) {
         // Create safety backup of current local data before overwriting
@@ -286,7 +286,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       return result.action;
     } catch (err: any) {
       console.error('[googleDriveSync] Sync failed:', err);
-      setSyncError(err.message || '同期中にエラーが発生しました。');
+      setSyncError(err.message === 'AUTH_REQUIRED' ? 'AUTH_REQUIRED' : err.message || '同期中にエラーが発生しました。');
       setIsSyncing(false);
       throw err;
     }
@@ -296,9 +296,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (gdriveLinked && !hasInitialSyncRun.current) {
       hasInitialSyncRun.current = true;
+      const autoSyncOnStartup = localStorage.getItem('auto_sync_on_startup') !== 'false';
+      if (!autoSyncOnStartup) return;
+
       hasUserMadeChangesRef.current = false;
       setAutoSyncStatus('syncing');
-      syncWithDrive()
+      syncWithDrive(false)
         .then(() => {
           setAutoSyncStatus('success');
           setTimeout(() => setAutoSyncStatus('idle'), 3000);
@@ -325,7 +328,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     autoSyncTimerRef.current = setTimeout(() => {
       hasUserMadeChangesRef.current = false;
       setAutoSyncStatus('syncing');
-      syncWithDrive()
+      syncWithDrive(false)
         .then(() => {
           setAutoSyncStatus('success');
           setTimeout(() => setAutoSyncStatus('idle'), 3000);

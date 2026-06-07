@@ -48,6 +48,8 @@ export default function Home() {
   // Temporary state for settings edits
   const [tempApiKey, setTempApiKey] = useState('');
   const [tempModelName, setTempModelName] = useState('gemini-2.5-flash-lite');
+  const [tempAutoSync, setTempAutoSync] = useState(true);
+  const [tempKeepLogin, setTempKeepLogin] = useState(true);
 
   // Connection Test state
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -88,6 +90,9 @@ export default function Home() {
     const savedModel = localStorage.getItem('gemini-model-name') || 'gemini-2.5-flash-lite';
     setApiKey(savedKey);
     setModelName(savedModel);
+    
+    setTempAutoSync(localStorage.getItem('auto_sync_on_startup') !== 'false');
+    setTempKeepLogin(localStorage.getItem('keep_google_login') !== 'false');
 
     // Get current date
     const d = new Date();
@@ -147,6 +152,9 @@ export default function Home() {
     
     localStorage.setItem('gemini-api-key', trimmedKey);
     localStorage.setItem('gemini-model-name', trimmedModel);
+    localStorage.setItem('auto_sync_on_startup', tempAutoSync ? 'true' : 'false');
+    localStorage.setItem('keep_google_login', tempKeepLogin ? 'true' : 'false');
+    
     setShowSettings(false);
   };
 
@@ -522,6 +530,22 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Auth Required Banner */}
+      {syncError === 'AUTH_REQUIRED' && (
+        <div className={styles.authBanner} style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #ffeeba' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={18} />
+            <strong>Google Drive の再認証が必要です</strong>
+          </div>
+          <button 
+            onClick={() => handleSyncWithDrive()} 
+            style={{ backgroundColor: '#856404', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            ワンタップでログイン
+          </button>
+        </div>
+      )}
+
       {/* Phase 3-2: Restore Banner */}
       {restoreInfo && (
         <div className={styles.restoreBanner}>
@@ -621,6 +645,34 @@ export default function Home() {
                   )}
                 </div>
 
+                <div className={styles.modalActions}>
+                  <button onClick={saveSettings} className={styles.saveBtn}>
+                    設定を保存
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Sync Settings Section ── */}
+              <div className={styles.settingsSection}>
+                <h4 className={styles.settingsSectionTitle}>🔄 同期設定</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={tempAutoSync}
+                      onChange={(e) => setTempAutoSync(e.target.checked)}
+                    />
+                    <span>起動時に自動同期する</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={tempKeepLogin}
+                      onChange={(e) => setTempKeepLogin(e.target.checked)}
+                    />
+                    <span>Googleログイン状態を維持する</span>
+                  </label>
+                </div>
                 <div className={styles.modalActions}>
                   <button onClick={saveSettings} className={styles.saveBtn}>
                     設定を保存
@@ -741,7 +793,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {syncError && (
+                  {syncError && syncError !== 'AUTH_REQUIRED' && (
                     <div className={styles.syncErrorBox}>
                       <AlertCircle size={14} /> {syncError}
                     </div>
