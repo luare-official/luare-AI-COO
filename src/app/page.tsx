@@ -2217,29 +2217,45 @@ const getActiveTaskRiskLevel = (task: TaskItem, todayStr: string) => {
 const calculatePriorityScore = (task: TaskItem, todayStr: string) => {
   let score = 0;
   
-  // 1. Risk Level (Deadline proximity)
-  const risk = getActiveTaskRiskLevel(task, todayStr);
-  if (risk === 'red') score += 50;
-  else if (risk === 'yellow') score += 20;
-  
-  // 2. Waiting status
-  if (task.waitingDays && task.waitingDays > 0) {
-    score -= 40; // Deprioritize waiting tasks
-  } else if (task.bottleneck) {
-    score -= 20; // Deprioritize tasks with bottlenecks
+  // 1. Deadline Proximity (Most Important)
+  if (task.deadline) {
+    const diffTime = new Date(task.deadline).getTime() - new Date(todayStr).getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 0) {
+      score = 100; // Past due or due today
+    } else {
+      // Subtract 2 points for every day remaining. 
+      // Example: 7 days = 86 points. 30 days = 40 points.
+      score = Math.max(20, 100 - (diffDays * 2));
+    }
+  } else {
+    score = 10; // No deadline
   }
   
+  // 2. Risk Level (ADHD Danger)
+  const risk = getActiveTaskRiskLevel(task, todayStr);
+  if (risk === 'red') score += 8;
+  else if (risk === 'yellow') score += 4;
+  
   // 3. Profit Impact (Project Importance)
-  if (task.profitImpact === 'High') score += 25;
-  else if (task.profitImpact === 'Medium') score += 10;
+  if (task.profitImpact === 'High') score += 5;
+  else if (task.profitImpact === 'Medium') score += 2;
   
   // 4. Estimated Effort (Quick wins)
   const estMin = getFinalEstimatedMinutes(task) || 60;
-  if (estMin <= 30) score += 15;
-  else if (estMin <= 120) score += 5;
+  if (estMin <= 30) score += 3;
+  else if (estMin <= 120) score += 1;
+  
+  // 5. Waiting status penalty
+  if (task.waitingDays && task.waitingDays > 0) {
+    score -= 15; // Deprioritize waiting tasks
+  } else if (task.bottleneck) {
+    score -= 10; // Deprioritize tasks with bottlenecks
+  }
   
   // Normalize score between 0 and 100
-  return Math.max(0, Math.min(100, score));
+  return Math.max(0, Math.min(100, Math.round(score)));
 };
 
 // Helper to determine CSS Grid column offset in Gantt chart for target date and absolute deadline overlays
