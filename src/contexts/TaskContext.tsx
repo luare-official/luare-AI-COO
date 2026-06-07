@@ -32,7 +32,8 @@ interface ItemContextType {
   lastSyncTime: number | null;
   syncError: string | null;
   autoSyncStatus: AutoSyncStatus;
-  syncWithDrive: () => Promise<'synced_to_cloud' | 'loaded_from_cloud' | 'merged_data' | 'already_up_to_date' | void>;
+  autoSyncMessage: string | null;
+  syncWithDrive: (interactive?: boolean) => Promise<{ action: string; localCount: number; cloudCount: number } | null>;
   disconnectDrive: () => void;
 }
 
@@ -223,6 +224,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [autoSyncStatus, setAutoSyncStatus] = useState<AutoSyncStatus>('idle');
+  const [autoSyncMessage, setAutoSyncMessage] = useState<string | null>(null);
   const hasUserMadeChangesRef = useRef(false);
   const hasInitialSyncRun = useRef(false);
   const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -249,7 +251,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     if (!GOOGLE_CLIENT_ID) {
       const errMessage = 'Google Client ID が設定されていません。.env.local を確認してください。';
       setSyncError(errMessage);
-      return;
+      return null;
     }
 
     setIsSyncing(true);
@@ -283,7 +285,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('gdrive_last_sync_time', String(now));
 
       setIsSyncing(false);
-      return result.action;
+      return { action: result.action, localCount: result.localCount, cloudCount: result.cloudCount };
     } catch (err: any) {
       console.error('[googleDriveSync] Sync failed:', err);
       setSyncError(err.message === 'AUTH_REQUIRED' ? 'AUTH_REQUIRED' : err.message || '同期中にエラーが発生しました。');
@@ -302,13 +304,28 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       hasUserMadeChangesRef.current = false;
       setAutoSyncStatus('syncing');
       syncWithDrive(false)
-        .then(() => {
+        .then((res) => {
+          if (res) {
+            let logMsg = '';
+            if (res.action === 'synced_to_cloud') logMsg = `保存完了 (L:${res.localCount} / C:${res.cloudCount})`;
+            else if (res.action === 'loaded_from_cloud') logMsg = `読込完了 (L:${res.localCount} / C:${res.cloudCount})`;
+            else if (res.action === 'merged_data') logMsg = `統合完了 (L:${res.localCount} / C:${res.cloudCount})`;
+            else if (res.action === 'already_up_to_date') logMsg = `最新 (L:${res.localCount} / C:${res.cloudCount})`;
+            setAutoSyncMessage(logMsg);
+          }
           setAutoSyncStatus('success');
-          setTimeout(() => setAutoSyncStatus('idle'), 3000);
+          setTimeout(() => {
+            setAutoSyncStatus('idle');
+            setAutoSyncMessage(null);
+          }, 4000);
         })
         .catch(() => {
           setAutoSyncStatus('error');
-          setTimeout(() => setAutoSyncStatus('idle'), 5000);
+          setAutoSyncMessage('同期失敗');
+          setTimeout(() => {
+            setAutoSyncStatus('idle');
+            setAutoSyncMessage(null);
+          }, 5000);
         });
     }
   }, [gdriveLinked, syncWithDrive]);
@@ -329,13 +346,28 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       hasUserMadeChangesRef.current = false;
       setAutoSyncStatus('syncing');
       syncWithDrive(false)
-        .then(() => {
+        .then((res) => {
+          if (res) {
+            let logMsg = '';
+            if (res.action === 'synced_to_cloud') logMsg = `保存完了 (L:${res.localCount} / C:${res.cloudCount})`;
+            else if (res.action === 'loaded_from_cloud') logMsg = `読込完了 (L:${res.localCount} / C:${res.cloudCount})`;
+            else if (res.action === 'merged_data') logMsg = `統合完了 (L:${res.localCount} / C:${res.cloudCount})`;
+            else if (res.action === 'already_up_to_date') logMsg = `最新 (L:${res.localCount} / C:${res.cloudCount})`;
+            setAutoSyncMessage(logMsg);
+          }
           setAutoSyncStatus('success');
-          setTimeout(() => setAutoSyncStatus('idle'), 3000);
+          setTimeout(() => {
+            setAutoSyncStatus('idle');
+            setAutoSyncMessage(null);
+          }, 4000);
         })
         .catch(() => {
           setAutoSyncStatus('error');
-          setTimeout(() => setAutoSyncStatus('idle'), 5000);
+          setAutoSyncMessage('同期失敗');
+          setTimeout(() => {
+            setAutoSyncStatus('idle');
+            setAutoSyncMessage(null);
+          }, 5000);
         });
     }, 4000);
 
@@ -360,7 +392,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       updateProjectSummaries, updateProjectSummary, clearAll,
       exportData, importData, getDataCounts: getDataCountsFn,
       restoreInfo, acceptRestore, dismissRestore,
-      gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus,
+      gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus, autoSyncMessage,
       syncWithDrive, disconnectDrive
     }}>
       {children}

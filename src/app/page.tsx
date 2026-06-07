@@ -19,7 +19,7 @@ export default function Home() {
     items, projectSummaries, addItem, updateItem, deleteItem, updateItems, 
     updateProjectSummaries, updateProjectSummary, clearAll, exportData, 
     importData, getDataCounts, restoreInfo, acceptRestore, dismissRestore,
-    gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus, syncWithDrive, disconnectDrive
+    gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus, autoSyncMessage, syncWithDrive, disconnectDrive
   } = useItems();
   const [inputValue, setInputValue] = useState('');
   const [isCooEvaluating, setIsCooEvaluating] = useState(false);
@@ -116,16 +116,18 @@ export default function Home() {
   const handleSyncWithDrive = async () => {
     setSyncMessage(null);
     try {
-      const action = await syncWithDrive();
+      const result = await syncWithDrive();
+      if (!result) return;
+      
       let msgText = '同期が完了しました。';
-      if (action === 'synced_to_cloud') {
-        msgText = 'ローカルをGoogle Driveへ保存しました';
-      } else if (action === 'loaded_from_cloud') {
-        msgText = 'Google Driveから読み込みました';
-      } else if (action === 'merged_data') {
-        msgText = 'ローカルとGoogle Driveをマージしました';
-      } else if (action === 'already_up_to_date') {
-        msgText = 'データは最新です';
+      if (result.action === 'synced_to_cloud') {
+        msgText = `Google Driveへ保存しました (同期前 ローカル:${result.localCount}件 / クラウド:${result.cloudCount}件)`;
+      } else if (result.action === 'loaded_from_cloud') {
+        msgText = `Google Driveから読み込みました (同期前 ローカル:${result.localCount}件 / クラウド:${result.cloudCount}件)`;
+      } else if (result.action === 'merged_data') {
+        msgText = `初回マージしました (同期前 ローカル:${result.localCount}件 / クラウド:${result.cloudCount}件)`;
+      } else if (result.action === 'already_up_to_date') {
+        msgText = `データは最新です (ローカル:${result.localCount}件 / クラウド:${result.cloudCount}件)`;
       }
       setSyncMessage({ type: 'success', text: msgText });
     } catch (err: any) {
@@ -513,8 +515,8 @@ export default function Home() {
               {autoSyncStatus === 'error' && <AlertCircle size={14} />}
               <span>
                 {autoSyncStatus === 'syncing' && '同期中...'}
-                {autoSyncStatus === 'success' && '同期完了'}
-                {autoSyncStatus === 'error' && '同期失敗'}
+                {autoSyncStatus === 'success' && (autoSyncMessage || '同期完了')}
+                {autoSyncStatus === 'error' && (autoSyncMessage || '同期失敗')}
               </span>
             </div>
           )}

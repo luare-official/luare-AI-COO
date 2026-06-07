@@ -259,6 +259,8 @@ export async function syncWithGoogleDrive(
 ): Promise<{
   action: 'synced_to_cloud' | 'loaded_from_cloud' | 'merged_data' | 'already_up_to_date';
   cloudData?: StorageData;
+  localCount: number;
+  cloudCount: number;
 }> {
   const token = await getAccessToken(interactive);
 
@@ -280,7 +282,7 @@ export async function syncWithGoogleDrive(
   // If the file does not exist, upload the current local data
   if (!file) {
     await uploadFile(token, localData);
-    return { action: 'synced_to_cloud' };
+    return { action: 'synced_to_cloud', localCount: localData.items?.length || 0, cloudCount: 0 };
   }
 
   const fileId = file.id;
@@ -300,7 +302,7 @@ export async function syncWithGoogleDrive(
   } catch (e) {
     // If the file is empty or corrupted, overwrite it with local data
     await updateFile(token, fileId, localData);
-    return { action: 'synced_to_cloud' };
+    return { action: 'synced_to_cloud', localCount: localData.items?.length || 0, cloudCount: 0 };
   }
 
   // 3. Count data items
@@ -310,19 +312,19 @@ export async function syncWithGoogleDrive(
   // Safeguard 1: If cloud is empty and local has data, always write local to cloud
   if (localCount > 0 && cloudCount === 0) {
     await updateFile(token, fileId, localData);
-    return { action: 'synced_to_cloud' };
+    return { action: 'synced_to_cloud', localCount, cloudCount };
   }
 
   // Safeguard 2: If local is empty and cloud has data, download cloud to local
   if (localCount === 0 && cloudCount > 0) {
-    return { action: 'loaded_from_cloud', cloudData };
+    return { action: 'loaded_from_cloud', cloudData, localCount, cloudCount };
   }
 
   // Safeguard 3: If it's the first sync and both have data, merge them
   if (isFirstSync && localCount > 0 && cloudCount > 0) {
     const merged = mergeStorageData(localData, cloudData);
     await updateFile(token, fileId, merged);
-    return { action: 'merged_data', cloudData: merged };
+    return { action: 'merged_data', cloudData: merged, localCount, cloudCount };
   }
 
   // 4. Otherwise compare savedAt timestamps
@@ -331,13 +333,13 @@ export async function syncWithGoogleDrive(
 
   if (cloudTime > localTime) {
     // Cloud data is newer
-    return { action: 'loaded_from_cloud', cloudData };
+    return { action: 'loaded_from_cloud', cloudData, localCount, cloudCount };
   } else if (localTime > cloudTime) {
     // Local data is newer
     await updateFile(token, fileId, localData);
-    return { action: 'synced_to_cloud' };
+    return { action: 'synced_to_cloud', localCount, cloudCount };
   } else {
     // Timestamps are equal
-    return { action: 'already_up_to_date' };
+    return { action: 'already_up_to_date', localCount, cloudCount };
   }
 }
