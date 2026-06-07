@@ -890,10 +890,28 @@ export default function Home() {
                     onChange={(e) => setEditTargetDate(e.target.value)}
                     className={styles.modalInput}
                   />
-                  <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
-                    <button onClick={() => handleQuickDate(setEditTargetDate, 1)} className={styles.inlineActionBtn}>+1日</button>
-                    <button onClick={() => handleQuickDate(setEditTargetDate, 3)} className={styles.inlineActionBtn}>+3日</button>
-                    <button onClick={() => handleQuickDate(setEditTargetDate, 7)} className={styles.inlineActionBtn}>+1週</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>絶対締切から逆算:</span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button 
+                        onClick={() => handleQuickDate(setEditTargetDate, -1, editDeadline)} 
+                        className={styles.inlineActionBtn}
+                        disabled={!editDeadline}
+                        style={{ padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                      >-1日</button>
+                      <button 
+                        onClick={() => handleQuickDate(setEditTargetDate, -3, editDeadline)} 
+                        className={styles.inlineActionBtn}
+                        disabled={!editDeadline}
+                        style={{ padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                      >-3日</button>
+                      <button 
+                        onClick={() => handleQuickDate(setEditTargetDate, -7, editDeadline)} 
+                        className={styles.inlineActionBtn}
+                        disabled={!editDeadline}
+                        style={{ padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                      >-1週</button>
+                    </div>
                   </div>
                 </div>
                 
@@ -1620,7 +1638,25 @@ export default function Home() {
                     </div>
                     <h4 className={styles.top3CardTitle}>{item.task.title}</h4>
                     <div className={styles.top3CardFooter}>
-                      <span className={styles.top3Score}>優先スコア{item.score}</span>
+                      <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                        {item.task.deadline && (() => {
+                          const diffTime = new Date(item.task.deadline).getTime() - new Date(todayStr).getTime();
+                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                          return (
+                            <span style={{ color: diffDays <= 3 ? 'var(--danger)' : 'inherit' }}>
+                              残り：{diffDays < 0 ? '期限超過' : `${diffDays}日`}
+                            </span>
+                          );
+                        })()}
+                        {(() => {
+                          const estMinutes = getFinalEstimatedMinutes(item.task);
+                          if (estMinutes) {
+                            const hours = estMinutes / 60;
+                            return <span>ADHD工数：{Number(hours.toFixed(1))}時間</span>;
+                          }
+                          return null;
+                        })()}
+                      </div>
                       <span className={styles.top3EditLink}>詳細・編集 ↗</span>
                     </div>
                   </div>
@@ -2013,22 +2049,18 @@ function TaskCard({
             {task.deadline < todayStr ? `⚠️ 絶対期限切れ: ${task.deadline}` : `絶対期限: ${task.deadline}`}
           </span>
         )}
-        {task.estimatedMinutes && (
-          <span className={`${styles.badge} ${styles.badgeEstimated}`} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', padding: '4px 8px', lineHeight: '1.4' }}>
-            <span style={{ fontWeight: 'bold' }}>
-              ⏳想定工数: {formatTime(getFinalEstimatedMinutes(task))}
-              {task.isEstimatedMinutesManual || task.manualAdhdMinutes !== undefined 
-                ? '（手動入力）' 
-                : '（AI推定）'}
-            </span>
-            {!(task.isEstimatedMinutesManual || task.manualAdhdMinutes !== undefined) && (
-              <span style={{ fontSize: '0.85em', opacity: 0.8 }}>
-                ※標準{formatTime(task.estimatedMinutes)}＋ADHD補正
+        {(() => {
+          const estMinutes = getFinalEstimatedMinutes(task);
+          if (estMinutes) {
+            const hours = estMinutes / 60;
+            return (
+              <span className={`${styles.badge} ${styles.badgeEstimated}`}>
+                ADHD工数：{Number(hours.toFixed(1))}時間
               </span>
-            )}
-            {task.actualMinutes ? <span style={{ fontSize: '0.85em', opacity: 0.8 }}>(実績: {formatTime(task.actualMinutes)})</span> : null}
-          </span>
-        )}
+            );
+          }
+          return null;
+        })()}
         {task.waitingDays && task.status === 'pending' && (
           <span className={`${styles.badge} ${styles.badgeWaiting}`}>
             🛑 待ち: {task.bottleneck || '外部処理'}
