@@ -33,7 +33,9 @@ interface ItemContextType {
   syncError: string | null;
   autoSyncStatus: AutoSyncStatus;
   autoSyncMessage: string | null;
-  syncWithDrive: (interactive?: boolean) => Promise<{ action: string; localCount: number; cloudCount: number } | null>;
+  gdriveFileId: string | null;
+  gdriveUserEmail: string | null;
+  syncWithDrive: (interactive?: boolean) => Promise<{ action: string; localCount: number; cloudCount: number; fileId?: string; userEmail?: string } | null>;
   disconnectDrive: () => void;
 }
 
@@ -225,6 +227,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [autoSyncStatus, setAutoSyncStatus] = useState<AutoSyncStatus>('idle');
   const [autoSyncMessage, setAutoSyncMessage] = useState<string | null>(null);
+  const [gdriveFileId, setGdriveFileId] = useState<string | null>(null);
+  const [gdriveUserEmail, setGdriveUserEmail] = useState<string | null>(null);
   const hasUserMadeChangesRef = useRef(false);
   const hasInitialSyncRun = useRef(false);
   const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -279,13 +283,22 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         storage.save(result.cloudData.items || [], result.cloudData.projectSummaries || []);
       }
 
+      if (result.fileId) setGdriveFileId(result.fileId);
+      if (result.userEmail) setGdriveUserEmail(result.userEmail);
+
       setGdriveLinked(true);
       const now = Date.now();
       setLastSyncTime(now);
       localStorage.setItem('gdrive_last_sync_time', String(now));
 
       setIsSyncing(false);
-      return { action: result.action, localCount: result.localCount, cloudCount: result.cloudCount };
+      return { 
+        action: result.action, 
+        localCount: result.localCount, 
+        cloudCount: result.cloudCount,
+        fileId: result.fileId,
+        userEmail: result.userEmail
+      };
     } catch (err: any) {
       console.error('[googleDriveSync] Sync failed:', err);
       setSyncError(err.message === 'AUTH_REQUIRED' ? 'AUTH_REQUIRED' : err.message || '同期中にエラーが発生しました。');
@@ -312,6 +325,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             else if (res.action === 'merged_data') logMsg = `統合完了 (L:${res.localCount} / C:${res.cloudCount})`;
             else if (res.action === 'already_up_to_date') logMsg = `最新 (L:${res.localCount} / C:${res.cloudCount})`;
             setAutoSyncMessage(logMsg);
+            
+            if (res.fileId) setGdriveFileId(res.fileId);
+            if (res.userEmail) setGdriveUserEmail(res.userEmail);
           }
           setAutoSyncStatus('success');
           setTimeout(() => {
@@ -354,6 +370,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             else if (res.action === 'merged_data') logMsg = `統合完了 (L:${res.localCount} / C:${res.cloudCount})`;
             else if (res.action === 'already_up_to_date') logMsg = `最新 (L:${res.localCount} / C:${res.cloudCount})`;
             setAutoSyncMessage(logMsg);
+            
+            if (res.fileId) setGdriveFileId(res.fileId);
+            if (res.userEmail) setGdriveUserEmail(res.userEmail);
           }
           setAutoSyncStatus('success');
           setTimeout(() => {
@@ -382,6 +401,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     setGdriveLinked(false);
     setLastSyncTime(null);
     setSyncError(null);
+    setGdriveFileId(null);
+    setGdriveUserEmail(null);
     localStorage.removeItem('gdrive_last_sync_time');
   }, []);
 
@@ -393,6 +414,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       exportData, importData, getDataCounts: getDataCountsFn,
       restoreInfo, acceptRestore, dismissRestore,
       gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus, autoSyncMessage,
+      gdriveFileId, gdriveUserEmail,
       syncWithDrive, disconnectDrive
     }}>
       {children}

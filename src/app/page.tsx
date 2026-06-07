@@ -19,7 +19,9 @@ export default function Home() {
     items, projectSummaries, addItem, updateItem, deleteItem, updateItems, 
     updateProjectSummaries, updateProjectSummary, clearAll, exportData, 
     importData, getDataCounts, restoreInfo, acceptRestore, dismissRestore,
-    gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus, autoSyncMessage, syncWithDrive, disconnectDrive
+    gdriveLinked, isSyncing, lastSyncTime, syncError, autoSyncStatus, autoSyncMessage, 
+    gdriveFileId, gdriveUserEmail,
+    syncWithDrive, disconnectDrive
   } = useItems();
   const [inputValue, setInputValue] = useState('');
   const [isCooEvaluating, setIsCooEvaluating] = useState(false);
@@ -787,6 +789,20 @@ export default function Home() {
                       </span>
                     )}
                   </div>
+
+                  {gdriveLinked && gdriveUserEmail && (
+                    <div className={styles.gdriveStatusRow}>
+                      <span className={styles.gdriveStatusLabel}>アカウント:</span>
+                      <span className={styles.gdriveStatusValue}>{gdriveUserEmail}</span>
+                    </div>
+                  )}
+
+                  {gdriveLinked && gdriveFileId && (
+                    <div className={styles.gdriveStatusRow}>
+                      <span className={styles.gdriveStatusLabel}>使用中ファイルID:</span>
+                      <span className={styles.gdriveStatusValue} style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{gdriveFileId}</span>
+                    </div>
+                  )}
 
                   {lastSyncTime && (
                     <div className={styles.gdriveStatusRow}>

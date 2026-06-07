@@ -261,8 +261,26 @@ export async function syncWithGoogleDrive(
   cloudData?: StorageData;
   localCount: number;
   cloudCount: number;
+  fileId?: string;
+  userEmail?: string;
 }> {
   const token = await getAccessToken(interactive);
+
+  // Get User Email
+  let userEmail = 'unknown';
+  try {
+    const aboutRes = await fetch(`https://www.googleapis.com/drive/v3/about?fields=user`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (aboutRes.ok) {
+      const aboutJson = await aboutRes.json();
+      if (aboutJson.user && aboutJson.user.emailAddress) {
+        userEmail = aboutJson.user.emailAddress;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch user email', e);
+  }
 
   // 1. Search for the file in Google Drive
   const searchRes = await fetch(
@@ -277,12 +295,38 @@ export async function syncWithGoogleDrive(
   }
 
   const searchJson = await searchRes.json();
-  const file = searchJson.files && searchJson.files[0];
+  const files = searchJson.files || [];
+
+  // If there are duplicate files, keep the newest one and delete the rest
+  if (files.length > 1) {
+    files.sort((a: any, b: any) => {
+      const timeA = new Date(a.modifiedTime || 0).getTime();
+      const timeB = new Date(b.modifiedTime || 0).getTime();
+      return timeB - timeA;
+    });
+    
+    // Delete older duplicates
+    for (let i = 1; i < files.length; i++) {
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${files[i].id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log(`Deleted duplicate file: ${files[i].id}`);
+      } catch (e) {
+        console.error(`Failed to delete duplicate file: ${files[i].id}`, e);
+      }
+    }
+  }
+
+  const file = files[0];
 
   // If the file does not exist, upload the current local data
   if (!file) {
+    // Wait, uploadFile doesn't return fileId, so we will return action without fileId
+    // Or we can retrieve it by searching again, but it's okay to just return what we have
     await uploadFile(token, localData);
-    return { action: 'synced_to_cloud', localCount: localData.items?.length || 0, cloudCount: 0 };
+    return { action: 'synced_to_cloud', localCount: localData.items?.length || 0, cloudCount: 0, userEmail };
   }
 
   const fileId = file.id;
@@ -302,7 +346,7 @@ export async function syncWithGoogleDrive(
   } catch (e) {
     // If the file is empty or corrupted, overwrite it with local data
     await updateFile(token, fileId, localData);
-    return { action: 'synced_to_cloud', localCount: localData.items?.length || 0, cloudCount: 0 };
+    return { action: 'synced_to_cloud', localCount: localData.items?.length || 0, cloudCount: 0, fileId, userEmail };
   }
 
   // 3. Count data items
@@ -312,19 +356,19 @@ export async function syncWithGoogleDrive(
   // Safeguard 1: If cloud is empty and local has data, always write local to cloud
   if (localCount > 0 && cloudCount === 0) {
     await updateFile(token, fileId, localData);
-    return { action: 'synced_to_cloud', localCount, cloudCount };
+    return { action: 'synced_to_cloud', localCount, cloudCount, fileId, userEmail };
   }
 
   // Safeguard 2: If local is empty and cloud has data, download cloud to local
   if (localCount === 0 && cloudCount > 0) {
-    return { action: 'loaded_from_cloud', cloudData, localCount, cloudCount };
+    return { action: 'loaded_from_cloud', cloudData, localCount, cloudCount, fileId, userEmail };
   }
 
   // Safeguard 3: If it's the first sync and both have data, merge them
   if (isFirstSync && localCount > 0 && cloudCount > 0) {
     const merged = mergeStorageData(localData, cloudData);
     await updateFile(token, fileId, merged);
-    return { action: 'merged_data', cloudData: merged, localCount, cloudCount };
+    return { action: 'merged_data', cloudData: merged, localCount, cloudCount, fileId, userEmail };
   }
 
   // 4. Otherwise compare savedAt timestamps
@@ -333,13 +377,13 @@ export async function syncWithGoogleDrive(
 
   if (cloudTime > localTime) {
     // Cloud data is newer
-    return { action: 'loaded_from_cloud', cloudData, localCount, cloudCount };
+    return { action: 'loaded_from_cloud', cloudData, localCount, cloudCount, fileId, userEmail };
   } else if (localTime > cloudTime) {
     // Local data is newer
     await updateFile(token, fileId, localData);
-    return { action: 'synced_to_cloud', localCount, cloudCount };
+    return { action: 'synced_to_cloud', localCount, cloudCount, fileId, userEmail };
   } else {
     // Timestamps are equal
-    return { action: 'already_up_to_date', localCount, cloudCount };
+    return { action: 'already_up_to_date', localCount, cloudCount, fileId, userEmail };
   }
 }
