@@ -69,6 +69,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   // Quick Add: Instantly adds as "unclassified"
   const addItem = useCallback((rawInput: string) => {
+    hasUserMadeChangesRef.current = true;
     const newItem: AppItem = {
       id: uuidv4(),
       type: 'unclassified',
@@ -80,6 +81,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateItem = useCallback((id: string, updates: Partial<AppItem>) => {
+    hasUserMadeChangesRef.current = true;
     setItems(prev => prev.map(item => {
       if (item.id === id) {
         return {
@@ -93,14 +95,17 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteItem = useCallback((id: string) => {
+    hasUserMadeChangesRef.current = true;
     setItems(prev => prev.filter(item => item.id !== id));
   }, []);
 
   const updateItems = useCallback((newItems: AppItem[]) => {
+    hasUserMadeChangesRef.current = true;
     setItems(newItems);
   }, []);
 
   const updateProjectSummaries = useCallback((newSummaries: ProjectSummary[]) => {
+    hasUserMadeChangesRef.current = true;
     setProjectSummaries(prev => {
       return newSummaries.map(ns => {
         const existing = prev.find(s => s.projectName === ns.projectName);
@@ -113,6 +118,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateProjectSummary = useCallback((projectName: string, updates: Partial<ProjectSummary>) => {
+    hasUserMadeChangesRef.current = true;
     setProjectSummaries(prev => {
       const exists = prev.some(s => s.projectName === projectName);
       if (exists) {
@@ -143,6 +149,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     // Create safety backup before clearing
     storage.createSafetyBackup();
     
+    hasUserMadeChangesRef.current = true;
     setItems([]);
     setProjectSummaries([]);
     storage.clearMainData();
@@ -177,6 +184,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     // Create a backup of current data before importing
     storage.createSafetyBackup();
 
+    hasUserMadeChangesRef.current = true;
     setItems(parsed.items);
     setProjectSummaries(parsed.projectSummaries);
 
@@ -194,6 +202,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   // Phase 3-2: Accept restore from backup
   const acceptRestore = useCallback(() => {
     if (!restoreInfo) return;
+    hasUserMadeChangesRef.current = true;
     const restored = storage.restoreFromBackup(restoreInfo.source);
     if (restored) {
       setItems(restored.items || []);
@@ -214,7 +223,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [autoSyncStatus, setAutoSyncStatus] = useState<AutoSyncStatus>('idle');
-  const skipAutoSyncRef = useRef(false);
+  const hasUserMadeChangesRef = useRef(false);
   const hasInitialSyncRun = useRef(false);
   const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -255,14 +264,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         projectSummaries: [],
       };
 
-      const isFirstSync = lastSyncTime === null;
+      const lastSync = localStorage.getItem('gdrive_last_sync_time');
+      const isFirstSync = !lastSync;
       const result = await gdrive.syncWithGoogleDrive(localData, isFirstSync);
 
       if ((result.action === 'loaded_from_cloud' || result.action === 'merged_data') && result.cloudData) {
         // Create safety backup of current local data before overwriting
         storage.createSafetyBackup();
         
-        skipAutoSyncRef.current = true;
         setItems(result.cloudData.items || []);
         setProjectSummaries(result.cloudData.projectSummaries || []);
         storage.save(result.cloudData.items || [], result.cloudData.projectSummaries || []);
@@ -281,12 +290,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       setIsSyncing(false);
       throw err;
     }
-  }, [items, projectSummaries, GOOGLE_CLIENT_ID, lastSyncTime]);
+  }, [GOOGLE_CLIENT_ID]);
 
   // Phase 4: Initial Auto Sync on mount
   useEffect(() => {
     if (gdriveLinked && !hasInitialSyncRun.current) {
       hasInitialSyncRun.current = true;
+      hasUserMadeChangesRef.current = false;
       setAutoSyncStatus('syncing');
       syncWithDrive()
         .then(() => {
@@ -304,8 +314,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoaded || !gdriveLinked) return;
 
-    if (skipAutoSyncRef.current) {
-      skipAutoSyncRef.current = false;
+    if (!hasUserMadeChangesRef.current) {
       return;
     }
 
@@ -314,6 +323,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }
 
     autoSyncTimerRef.current = setTimeout(() => {
+      hasUserMadeChangesRef.current = false;
       setAutoSyncStatus('syncing');
       syncWithDrive()
         .then(() => {
