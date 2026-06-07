@@ -1657,7 +1657,31 @@ export default function Home() {
                           return null;
                         })()}
                       </div>
-                      <span className={styles.top3EditLink}>詳細・編集 ↗</span>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTaskStatus(item.task);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: 'var(--accent)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          ✅ 完了
+                        </button>
+                        <span className={styles.top3EditLink}>詳細・編集 ↗</span>
+                      </div>
                     </div>
                   </div>
                 ));
